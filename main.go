@@ -32,7 +32,10 @@ const (
 	Retry
 )
 
-const RETRY_LIMIT int = 3
+const (
+	RETRY_LIMIT   int = 3
+	ATTEMPT_LIMIT int = 3
+)
 
 // add a backend to the server pool
 func (s *ServerPool) AddBackend(backend *Backend) {
@@ -132,6 +135,14 @@ func isBackendAlive(u *url.URL) bool {
 
 // load balances the incoming requests
 func lb(w http.ResponseWriter, r *http.Request) {
+	attempts := GetAttemptsFromContext(r)
+
+	if attempts > ATTEMPT_LIMIT {
+		log.Printf("%s(%s) Max attempts reached, terminating\n", r.RemoteAddr, r.URL.Path)
+		http.Error(w, "Service not available", http.StatusServiceUnavailable)
+		return
+	}
+
 	peer := serverPool.GetNextPeer()
 
 	if peer != nil {
